@@ -177,6 +177,7 @@ body {
 }
 
 .field input {
+  width: 100%;
   background: var(--sidebar-surface);
   border: 1.5px solid var(--sidebar-border);
   border-radius: 9px;
@@ -199,6 +200,44 @@ body {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.place-autocomplete-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.place-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--sidebar-surface);
+  border: 1.5px solid var(--sidebar-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-height: 260px;
+  overflow-y: auto;
+  animation: fadeSlideUp 0.14s var(--ease);
+}
+
+.place-suggestion {
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.place-suggestion.active,
+.place-suggestion:hover {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
 }
 
 .field-hint {
@@ -226,6 +265,199 @@ body {
   padding: 10px 12px;
   font-size: 0.82rem;
   font-weight: 500;
+}
+
+/* ---------- Date/time picker ---------- */
+
+.datetime-picker {
+  position: relative;
+}
+
+.datetime-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--sidebar-surface);
+  border: 1.5px solid var(--sidebar-border);
+  border-radius: 9px;
+  color: var(--sidebar-text);
+  padding: 9px 11px;
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.datetime-picker-trigger:hover {
+  border-color: #c7cdd7;
+}
+
+.datetime-picker-icon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--accent-dark);
+}
+
+.datetime-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: 280px;
+  background: var(--sidebar-surface);
+  border: 1.5px solid var(--sidebar-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  animation: fadeSlideUp 0.16s var(--ease);
+}
+
+.datetime-picker-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.datetime-picker-month-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.datetime-picker-nav {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--sidebar-surface-alt);
+  color: var(--sidebar-text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.datetime-picker-nav:hover {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.datetime-picker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--sidebar-text-dim);
+  margin-bottom: 4px;
+}
+
+.datetime-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.datetime-picker-day {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.datetime-picker-day:hover:not(:disabled) {
+  background: var(--sidebar-surface-alt);
+}
+
+.datetime-picker-day.selected {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.datetime-picker-day:disabled {
+  color: #d4d7dd;
+  cursor: not-allowed;
+}
+
+.datetime-picker-time-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sidebar-border);
+}
+
+.datetime-picker-select {
+  flex: 1;
+  appearance: none;
+  background: var(--sidebar-surface-alt);
+  border: 1.5px solid var(--sidebar-border);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--sidebar-text);
+  text-align: center;
+  cursor: pointer;
+}
+
+.datetime-picker-colon {
+  font-weight: 700;
+  color: var(--sidebar-text-dim);
+}
+
+.datetime-picker-ampm {
+  display: flex;
+  border: 1.5px solid var(--sidebar-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.datetime-picker-ampm button {
+  border: none;
+  background: var(--sidebar-surface-alt);
+  color: var(--sidebar-text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 7px 8px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.datetime-picker-ampm button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.datetime-picker-done {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--sidebar-surface-alt);
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.datetime-picker-done:hover {
+  background: var(--accent-soft);
 }
 
 /* ---------- Submit button ---------- */
@@ -347,6 +579,14 @@ body {
   font-family: var(--font-body);
 }
 
+.route-card-description {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--sidebar-text);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .route-card-stats {
   display: flex;
   gap: 12px;
@@ -355,6 +595,12 @@ body {
   font-size: 0.76rem;
   color: var(--sidebar-text-dim);
   font-weight: 500;
+}
+
+.route-card-stats-risk {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--sidebar-border);
 }
 
 .stat-no-travel {
@@ -398,14 +644,30 @@ body {
   position: relative;
 }
 
-.map-placeholder {
+.map-loading-pill {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--map-text-dim);
-  font-size: 0.95rem;
-  font-family: var(--font-body);
+  gap: 10px;
+  background: rgba(15, 24, 41, 0.6);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 9px 18px;
+  color: var(--map-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+  z-index: 6;
+  animation: fadeSlideUp 0.3s var(--ease);
+}
+
+.dot-pulse-dark span {
+  background: var(--accent);
 }
 
 .map-missing-token {
@@ -536,8 +798,10 @@ body {
 }
 
 .route-chip {
-  background: rgba(15, 24, 41, 0.92);
-  border: 2px solid var(--map-panel-border);
+  background: rgba(15, 24, 41, 0.55);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 2px solid rgba(255, 255, 255, 0.12);
   color: var(--map-text);
   border-radius: 14px;
   padding: 7px 14px;
@@ -546,15 +810,17 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  transition: transform 0.15s var(--ease), background 0.15s var(--ease);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.15s var(--ease), background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
 .route-chip:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .route-chip.active {
-  background: #111f36;
+  background: rgba(17, 31, 54, 0.72);
   border-width: 2.5px;
 }
 
@@ -573,36 +839,47 @@ body {
 
 .style-switcher {
   position: absolute;
-  top: 100px;
+  bottom: 48px;
   right: 12px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 230px;
   z-index: 5;
 }
 
 .style-chip {
-  background: rgba(15, 24, 41, 0.92);
-  border: 1px solid var(--map-panel-border);
+  background: rgba(15, 24, 41, 0.5);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--map-text);
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 0.71rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  text-align: left;
-  transition: background 0.15s var(--ease), transform 0.15s var(--ease);
+  text-align: center;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.15s var(--ease), background 0.15s var(--ease), box-shadow 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
 .style-chip:hover {
-  transform: translateX(-2px);
+  transform: translateY(-2px);
+  background: rgba(15, 24, 41, 0.68);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .style-chip.active {
-  background: var(--accent);
-  color: #06260f;
+  background: rgba(22, 163, 74, 0.55);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  color: #fff;
   font-weight: 700;
-  border-color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 18px rgba(22, 163, 74, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .checkpoint-popup-place {
@@ -613,22 +890,25 @@ body {
 
 .heatmap-overlay {
   position: absolute;
-  bottom: 16px;
-  left: 12px;
+  bottom: 128px;
   right: 12px;
+  left: auto;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   z-index: 5;
   pointer-events: none;
 }
 
 .heatmap-slider {
-  background: rgba(15, 24, 41, 0.95);
-  border: 1px solid var(--map-panel-border);
-  border-radius: 10px;
+  background: rgba(15, 24, 41, 0.55);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
   padding: 10px 16px;
-  min-width: 320px;
+  width: 260px;
   pointer-events: auto;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .heatmap-toggle {
@@ -642,20 +922,23 @@ body {
 
 .heatmap-slider-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   margin-top: 8px;
 }
 
 .heatmap-slider-row input[type="range"] {
-  flex: 1;
+  width: 100%;
   accent-color: var(--accent);
 }
 
 .heatmap-slider-time {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--map-text-dim);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 860px) {

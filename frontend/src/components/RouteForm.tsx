@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PlaceAutocomplete from "./PlaceAutocomplete";
+import DateTimePicker from "./DateTimePicker";
 import type { Place } from "../types";
 
 export interface FormValues {
@@ -54,13 +55,7 @@ export default function RouteForm({ onSubmit, loading }: Props) {
 
       <label className="field">
         <span className="field-label">Departure date &amp; time</span>
-        <input
-          type="datetime-local"
-          value={departureLocal}
-          min={nowLocal()}
-          onChange={(e) => setDepartureLocal(e.target.value)}
-          required
-        />
+        <DateTimePicker value={departureLocal} onChange={setDepartureLocal} min={nowLocal()} />
         {isPastDeparture && (
           <span className="field-error">Departure time can't be in the past — weather forecasts only cover today onward.</span>
         )}

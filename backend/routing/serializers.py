@@ -18,6 +18,11 @@ class GeocodeRequestSerializer(serializers.Serializer):
     query = serializers.CharField(min_length=2)
 
 
+class GeocodeSuggestRequestSerializer(serializers.Serializer):
+    query = serializers.CharField(min_length=2)
+    limit = serializers.IntegerField(required=False, default=5, min_value=1, max_value=10)
+
+
 class ReverseGeocodeRequestSerializer(serializers.Serializer):
     lat = serializers.FloatField(min_value=-90, max_value=90)
     lon = serializers.FloatField(min_value=-180, max_value=180)

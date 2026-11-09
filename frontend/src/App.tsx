@@ -87,36 +87,45 @@ export default function App() {
         <RouteForm onSubmit={handleSubmit} loading={planLoading} />
         {planError && <p className="error-banner card-enter">{planError}</p>}
         {plan && (
-          <RouteSummaryCards routes={plan.routes} selectedRouteId={selectedRouteId} onSelectRoute={handleSelectRoute} />
+          <RouteSummaryCards
+            routes={plan.routes}
+            selectedRouteId={selectedRouteId}
+            onSelectRoute={handleSelectRoute}
+            departureIso={plan.departure_time}
+          />
         )}
         <Legend />
       </aside>
       <main className="map-pane">
-        {plan ? (
-          <>
-            <MapView
-              plan={plan}
-              selectedRouteId={selectedRouteId}
-              onSelectRoute={handleSelectRoute}
-              heatmapPoints={heatmapPoints}
-              heatmapHour={heatmapHour}
-              showHeatmap={showHeatmap}
+        <MapView
+          plan={plan}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={handleSelectRoute}
+          heatmapPoints={heatmapPoints}
+          heatmapHour={heatmapHour}
+          showHeatmap={showHeatmap}
+        />
+        {planLoading && (
+          <div className="map-loading-pill">
+            <span className="dot-pulse dot-pulse-dark">
+              <span />
+              <span />
+              <span />
+            </span>
+            Calculating routes and checkpoint weather…
+          </div>
+        )}
+        {plan && (
+          <div className="heatmap-overlay">
+            <HeatmapSlider
+              hour={heatmapHour}
+              maxHour={48}
+              onChange={setHeatmapHour}
+              show={showHeatmap}
+              onToggle={setShowHeatmap}
+              departureIso={plan.departure_time}
+              loading={heatmapLoading}
             />
-            <div className="heatmap-overlay">
-              <HeatmapSlider
-                hour={heatmapHour}
-                maxHour={48}
-                onChange={setHeatmapHour}
-                show={showHeatmap}
-                onToggle={setShowHeatmap}
-                departureIso={plan.departure_time}
-                loading={heatmapLoading}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="map-placeholder">
-            {planLoading ? "Calculating routes and checkpoint weather…" : "Enter a trip to see routes on the map."}
           </div>
         )}
       </main>

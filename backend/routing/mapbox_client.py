@@ -40,6 +40,29 @@ def geocode(place: str) -> tuple[float, float, str]:
     return lat, lon, best.get("place_name", place)
 
 
+def geocode_suggestions(query: str, limit: int = 5) -> list[dict]:
+    """
+    Returns up to `limit` candidate matches for a partial/in-progress query,
+    for a live typeahead dropdown. Unlike geocode(), this does not raise on
+    a low-relevance top match -- the user picks from the list themselves, so
+    weak matches are fine to show (just not auto-selected).
+    """
+    token = settings.MAPBOX_TOKEN
+    if not token:
+        raise MapboxError("MAPBOX_TOKEN is not configured on the server")
+
+    url = GEOCODE_URL.format(query=requests.utils.quote(query))
+    resp = requests.get(url, params={"access_token": token, "limit": limit}, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    features = data.get("features", [])
+    results = []
+    for f in features:
+        lon, lat = f["center"]
+        results.append({"lat": lat, "lon": lon, "label": f.get("place_name", query)})
+    return results
+
+
 def reverse_geocode(lat: float, lon: float) -> str:
     """Returns a short human-readable place label for a coordinate (e.g. 'Hays, Kansas')."""
     token = settings.MAPBOX_TOKEN

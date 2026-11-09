@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Layer, Marker, NavigationControl, Popup, ScaleControl, Source, type MapRef } from "react-map-gl/mapbox";
+import type { Map as MapboxMap } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Checkpoint, HeatmapPoint, PlanResponse } from "../types";
 import { riskColor, ROUTE_COLORS } from "../riskColors";
@@ -8,15 +9,19 @@ import { reverseGeocode } from "../api";
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
 const MAP_STYLES: { key: string; label: string; url: string }[] = [
+  { key: "satellite", label: "Satellite", url: "mapbox://styles/mapbox/satellite-streets-v12" },
   { key: "streets", label: "Streets", url: "mapbox://styles/mapbox/streets-v12" },
   { key: "light", label: "Light", url: "mapbox://styles/mapbox/light-v11" },
-  { key: "satellite", label: "Satellite", url: "mapbox://styles/mapbox/satellite-streets-v12" },
   { key: "outdoors", label: "Terrain", url: "mapbox://styles/mapbox/outdoors-v12" },
   { key: "dark", label: "Dark", url: "mapbox://styles/mapbox/dark-v11" },
 ];
 
+const GLOBE_IDLE_CENTER: [number, number] = [10, 25];
+const GLOBE_IDLE_ZOOM = 1.15;
+const GLOBE_SPIN_DEG_PER_SEC = 3;
+
 interface Props {
-  plan: PlanResponse;
+  plan: PlanResponse | null;
   selectedRouteId: number;
   onSelectRoute: (id: number) => void;
   heatmapPoints: HeatmapPoint[] | null;
@@ -49,12 +54,88 @@ function formatDuration(seconds: number): string {
 
 export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapPoints, heatmapHour, showHeatmap }: Props) {
   const mapRef = useRef<MapRef | null>(null);
+  const spinFrameRef = useRef<number | null>(null);
+  const spinningRef = useRef(true);
+  const [mapInstance, setMapInstance] = useState<MapboxMap | null>(null);
   const [activeCheckpoint, setActiveCheckpoint] = useState<Checkpoint | null>(null);
-  const [mapStyleKey, setMapStyleKey] = useState("streets");
+  const [mapStyleKey, setMapStyleKey] = useState("satellite");
   const [placeNames, setPlaceNames] = useState<Record<string, string>>({});
   const [placeLoadingKey, setPlaceLoadingKey] = useState<string | null>(null);
-  const initialBounds = useMemo(() => boundsFromRoutes(plan), [plan]);
+  const targetBounds = useMemo(() => (plan ? boundsFromRoutes(plan) : null), [plan]);
   const mapStyleUrl = MAP_STYLES.find((s) => s.key === mapStyleKey)?.url ?? MAP_STYLES[0].url;
+
+  // react-map-gl's onLoad can be missed (e.g. a recycled map instance under
+  // React StrictMode's double-mount in dev), so poll for the underlying
+  // mapboxgl.Map instance directly instead of relying on that event.
+  useEffect(() => {
+    let cancelled = false;
+    let pollId: ReturnType<typeof setInterval> | null = null;
+
+    function check() {
+      const map = mapRef.current?.getMap();
+      if (map && !cancelled) {
+        setMapInstance(map);
+        if (pollId) clearInterval(pollId);
+      }
+    }
+    check();
+    if (!mapInstance) pollId = setInterval(check, 50);
+
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Idle globe auto-rotation, stopped permanently once a plan is loaded or the user interacts.
+  useEffect(() => {
+    if (!mapInstance || plan) return;
+    const map = mapInstance;
+
+    spinningRef.current = true;
+    let last = performance.now();
+
+    function frame(now: number) {
+      if (!spinningRef.current) return;
+      const dt = (now - last) / 1000;
+      last = now;
+      const center = map!.getCenter();
+      center.lng += GLOBE_SPIN_DEG_PER_SEC * dt;
+      map!.setCenter(center);
+      spinFrameRef.current = requestAnimationFrame(frame);
+    }
+
+    function stopSpin() {
+      spinningRef.current = false;
+      if (spinFrameRef.current) cancelAnimationFrame(spinFrameRef.current);
+    }
+
+    map.on("dragstart", stopSpin);
+    map.on("zoomstart", stopSpin);
+    spinFrameRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      stopSpin();
+      map.off("dragstart", stopSpin);
+      map.off("zoomstart", stopSpin);
+    };
+  }, [mapInstance, plan]);
+
+  // Smooth cinematic zoom from the idle globe into the route corridor once a plan loads.
+  useEffect(() => {
+    if (!mapInstance || !targetBounds) return;
+    spinningRef.current = false;
+    if (spinFrameRef.current) cancelAnimationFrame(spinFrameRef.current);
+
+    mapInstance.fitBounds(targetBounds, {
+      padding: 70,
+      duration: 3200,
+      essential: true,
+      curve: 1.42,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapInstance, targetBounds]);
 
   useEffect(() => {
     if (!activeCheckpoint) return;
@@ -94,7 +175,7 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
     );
   }
 
-  const orderedRoutes = [...plan.routes].sort((a, b) => (a.id === selectedRouteId ? 1 : 0) - (b.id === selectedRouteId ? 1 : 0));
+  const orderedRoutes = plan ? [...plan.routes].sort((a, b) => (a.id === selectedRouteId ? 1 : 0) - (b.id === selectedRouteId ? 1 : 0)) : [];
   const activeKey = activeCheckpoint ? placeKey(activeCheckpoint.lat, activeCheckpoint.lon) : null;
   const activePlaceName = activeKey ? placeNames[activeKey] : null;
 
@@ -102,9 +183,11 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
     <Map
       ref={mapRef}
       mapboxAccessToken={MAPBOX_TOKEN}
-      initialViewState={{ bounds: initialBounds, fitBoundsOptions: { padding: 60 } }}
+      initialViewState={{ longitude: GLOBE_IDLE_CENTER[0], latitude: GLOBE_IDLE_CENTER[1], zoom: GLOBE_IDLE_ZOOM }}
       style={{ width: "100%", height: "100%" }}
       mapStyle={mapStyleUrl}
+      projection="globe"
+      fog={{}}
     >
       <NavigationControl position="top-right" visualizePitch />
       <ScaleControl position="bottom-right" unit="imperial" />
@@ -153,7 +236,7 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
         );
       })}
 
-      {plan.routes[selectedRouteId]?.checkpoints.map((cp, idx, arr) => {
+      {plan?.routes[selectedRouteId]?.checkpoints.map((cp, idx, arr) => {
         const isEndpoint = idx === 0 || idx === arr.length - 1;
         return (
           <Marker key={idx} longitude={cp.lon} latitude={cp.lat}>
@@ -164,7 +247,7 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
                 onMouseLeave={() => setActiveCheckpoint((cur) => (cur === cp ? null : cur))}
               >
                 <span className="endpoint-pin-icon">{idx === 0 ? "A" : "B"}</span>
-                <span className="endpoint-pin-label">{idx === 0 ? plan.origin.label : plan.destination.label}</span>
+                <span className="endpoint-pin-label">{idx === 0 ? plan!.origin.label : plan!.destination.label}</span>
               </div>
             ) : (
               <div
@@ -210,24 +293,26 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
         </Popup>
       )}
 
-      <div className="route-picker">
-        {plan.routes.map((route) => (
-          <button
-            key={route.id}
-            className={route.id === selectedRouteId ? "route-chip active" : "route-chip"}
-            onClick={() => onSelectRoute(route.id)}
-            style={{ borderColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length] }}
-          >
-            <span className="route-chip-title">
-              {route.recommended ? "★ " : ""}Route {route.id + 1}
-            </span>
-            <span className="route-chip-summary">
-              {route.summary.distance_mi} mi · {formatDuration(route.summary.duration_s)} ·{" "}
-              <span style={{ color: riskColor(route.summary.overall_risk) }}>{route.summary.overall_risk}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      {plan && (
+        <div className="route-picker">
+          {plan.routes.map((route) => (
+            <button
+              key={route.id}
+              className={route.id === selectedRouteId ? "route-chip active" : "route-chip"}
+              onClick={() => onSelectRoute(route.id)}
+              style={{ borderColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length] }}
+            >
+              <span className="route-chip-title">
+                {route.recommended ? "★ " : ""}Route {route.id + 1}
+              </span>
+              <span className="route-chip-summary">
+                {route.summary.distance_mi} mi · {formatDuration(route.summary.duration_s)} ·{" "}
+                <span style={{ color: riskColor(route.summary.overall_risk) }}>{route.summary.overall_risk}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="style-switcher">
         {MAP_STYLES.map((s) => (

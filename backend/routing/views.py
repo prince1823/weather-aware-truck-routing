@@ -11,7 +11,13 @@ from .geometry import build_cumulative_points, sample_checkpoints
 from .heatmap import build_corridor_heatmap
 from .recommendation import CheckpointResult, rank_routes, summarize_route
 from .risk import WeatherSample, classify_checkpoint_risk
-from .serializers import GeocodeRequestSerializer, HeatmapRequestSerializer, PlanRequestSerializer, ReverseGeocodeRequestSerializer
+from .serializers import (
+    GeocodeRequestSerializer,
+    GeocodeSuggestRequestSerializer,
+    HeatmapRequestSerializer,
+    PlanRequestSerializer,
+    ReverseGeocodeRequestSerializer,
+)
 from .weather_client import WeatherServiceError, fetch_hourly_batch
 
 
@@ -29,6 +35,19 @@ def geocode(request):
     except mapbox_client.MapboxError as exc:
         return Response({"error": str(exc)}, status=400)
     return Response({"lat": lat, "lon": lon, "label": place_name})
+
+
+@api_view(["GET"])
+def geocode_suggest(request):
+    serializer = GeocodeSuggestRequestSerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    try:
+        suggestions = mapbox_client.geocode_suggestions(
+            serializer.validated_data["query"], limit=serializer.validated_data["limit"]
+        )
+    except mapbox_client.MapboxError as exc:
+        return Response({"error": str(exc)}, status=400)
+    return Response({"suggestions": suggestions})
 
 
 @api_view(["GET"])
