@@ -10,6 +10,11 @@ export async function geocode(query: string): Promise<Place> {
   return res.data;
 }
 
+export async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  const res = await client.get("/api/reverse-geocode/", { params: { lat, lon } });
+  return res.data.label;
+}
+
 export interface PlanRequest {
   origin: Place;
   destination: Place;

@@ -18,6 +18,11 @@ class GeocodeRequestSerializer(serializers.Serializer):
     query = serializers.CharField(min_length=2)
 
 
+class ReverseGeocodeRequestSerializer(serializers.Serializer):
+    lat = serializers.FloatField(min_value=-90, max_value=90)
+    lon = serializers.FloatField(min_value=-180, max_value=180)
+
+
 class HeatmapRequestSerializer(serializers.Serializer):
     geometry = serializers.DictField()
     distances_m = serializers.ListField(child=serializers.FloatField())

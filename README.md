@@ -32,10 +32,15 @@ the truck's load weight.
    treating each checkpoint's risk as representative of the segment running
    to the next checkpoint.
 7. **Map & heatmap** — the frontend renders all 3 routes, color-coded
-   checkpoints, and a weather-risk heatmap along the selected route's
-   corridor (sampled every 20 mi) with a 0–48h forecast slider, powered by a
-   dedicated `/api/heatmap/` endpoint so scrubbing the slider doesn't
-   refetch from the network.
+   checkpoints labeled with their mile marker, distinct origin/destination
+   pins labeled with the resolved place name, and a weather-risk heatmap
+   along the selected route's corridor (sampled every 20 mi) with a 0–48h
+   forecast slider, powered by a dedicated `/api/heatmap/` endpoint so
+   scrubbing the slider doesn't refetch from the network. Clicking a
+   checkpoint lazily reverse-geocodes it (cached client-side) so its popup
+   shows the nearest named place alongside ETA, risk level and weather
+   detail. Zoom controls, a scale bar, and a basemap switcher (Streets /
+   Light / Satellite / Terrain / Dark) are built into the map.
 
 ## Project layout
 
@@ -82,6 +87,7 @@ Frontend runs at `http://localhost:5173`.
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/api/geocode/?query=...` | GET | Resolve free-text place name to `{lat, lon, label}` |
+| `/api/reverse-geocode/?lat=...&lon=...` | GET | Resolve coordinates to a place label (used lazily for checkpoint popups) |
 | `/api/plan/` | POST | Full route plan: 3 routes, checkpoints, risk, recommendation |
 | `/api/heatmap/` | POST | Corridor weather-risk grid for a single route, hours 0–48 |
 | `/api/health/` | GET | Liveness check |

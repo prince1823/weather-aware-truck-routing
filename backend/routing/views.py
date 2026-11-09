@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -11,7 +11,7 @@ from .geometry import build_cumulative_points, sample_checkpoints
 from .heatmap import build_corridor_heatmap
 from .recommendation import CheckpointResult, rank_routes, summarize_route
 from .risk import WeatherSample, classify_checkpoint_risk
-from .serializers import GeocodeRequestSerializer, HeatmapRequestSerializer, PlanRequestSerializer
+from .serializers import GeocodeRequestSerializer, HeatmapRequestSerializer, PlanRequestSerializer, ReverseGeocodeRequestSerializer
 from .weather_client import fetch_hourly_batch
 
 
@@ -31,6 +31,17 @@ def geocode(request):
     return Response({"lat": lat, "lon": lon, "label": place_name})
 
 
+@api_view(["GET"])
+def reverse_geocode(request):
+    serializer = ReverseGeocodeRequestSerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    try:
+        label = mapbox_client.reverse_geocode(serializer.validated_data["lat"], serializer.validated_data["lon"])
+    except mapbox_client.MapboxError as exc:
+        return Response({"error": str(exc)}, status=400)
+    return Response({"label": label})
+
+
 @api_view(["POST"])
 def plan(request):
     serializer = PlanRequestSerializer(data=request.data)
@@ -41,6 +52,9 @@ def plan(request):
     destination = data["destination"]
     departure_time = data["departure_time"]
     load_weight_lb = data["load_weight_lb"]
+
+    if departure_time < datetime.now(timezone.utc):
+        return Response({"error": "Departure time cannot be in the past"}, status=400)
 
     try:
         raw_routes = mapbox_client.get_routes((origin["lat"], origin["lon"]), (destination["lat"], destination["lon"]))
@@ -79,6 +93,10 @@ def plan(request):
             eta = departure_time + timedelta(seconds=cp.duration_s)
             sample = series.sample_at(eta)
             if sample is None:
+                if series.times and eta > series.times[-1]:
+                    reason = "forecast unavailable beyond 16-day window; treated as Low"
+                else:
+                    reason = "no forecast data for this time; treated as Low"
                 checkpoint_results.append(
                     CheckpointResult(
                         lat=cp.lat,
@@ -86,7 +104,7 @@ def plan(request):
                         distance_mi=round(cp.distance_mi, 1),
                         eta=eta.isoformat(),
                         risk_level="Low",
-                        reason="forecast unavailable beyond 16-day window; treated as Low",
+                        reason=reason,
                         wind_mph=None,
                         rain_in_hr=None,
                         snow_in_hr=None,

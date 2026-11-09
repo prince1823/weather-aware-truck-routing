@@ -14,11 +14,19 @@ interface Props {
   loading: boolean;
 }
 
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function defaultDepartureLocal(): string {
   const d = new Date(Date.now() + 60 * 60 * 1000);
   d.setMinutes(0, 0, 0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return toLocalInputValue(d);
+}
+
+function nowLocal(): string {
+  return toLocalInputValue(new Date());
 }
 
 export default function RouteForm({ onSubmit, loading }: Props) {
@@ -28,12 +36,13 @@ export default function RouteForm({ onSubmit, loading }: Props) {
   const [loadWeight, setLoadWeight] = useState(34000);
   const [touched, setTouched] = useState(false);
 
-  const canSubmit = Boolean(origin && destination && departureLocal && loadWeight > 0);
+  const isPastDeparture = Boolean(departureLocal) && new Date(departureLocal) < new Date();
+  const canSubmit = Boolean(origin && destination && departureLocal && loadWeight > 0 && !isPastDeparture);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
-    if (!origin || !destination) return;
+    if (!canSubmit || !origin || !destination) return;
     onSubmit({ origin, destination, departureLocal, loadWeightLb: loadWeight });
   }
 
@@ -48,9 +57,13 @@ export default function RouteForm({ onSubmit, loading }: Props) {
         <input
           type="datetime-local"
           value={departureLocal}
+          min={nowLocal()}
           onChange={(e) => setDepartureLocal(e.target.value)}
           required
         />
+        {isPastDeparture && (
+          <span className="field-error">Departure time can't be in the past — weather forecasts only cover today onward.</span>
+        )}
       </label>
 
       <label className="field">

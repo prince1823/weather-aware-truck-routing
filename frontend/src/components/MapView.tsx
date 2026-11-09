@@ -1,10 +1,19 @@
-import { useMemo, useRef, useState } from "react";
-import Map, { Layer, Marker, Popup, Source, type MapRef } from "react-map-gl/mapbox";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Map, { Layer, Marker, NavigationControl, Popup, ScaleControl, Source, type MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Checkpoint, HeatmapPoint, PlanResponse } from "../types";
 import { riskColor, ROUTE_COLORS } from "../riskColors";
+import { reverseGeocode } from "../api";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || "";
+
+const MAP_STYLES: { key: string; label: string; url: string }[] = [
+  { key: "streets", label: "Streets", url: "mapbox://styles/mapbox/streets-v12" },
+  { key: "light", label: "Light", url: "mapbox://styles/mapbox/light-v11" },
+  { key: "satellite", label: "Satellite", url: "mapbox://styles/mapbox/satellite-streets-v12" },
+  { key: "outdoors", label: "Terrain", url: "mapbox://styles/mapbox/outdoors-v12" },
+  { key: "dark", label: "Dark", url: "mapbox://styles/mapbox/dark-v11" },
+];
 
 interface Props {
   plan: PlanResponse;
@@ -28,10 +37,30 @@ function boundsFromRoutes(plan: PlanResponse): [[number, number], [number, numbe
   return [[minLon, minLat], [maxLon, maxLat]];
 }
 
+function placeKey(lat: number, lon: number): string {
+  return `${lat.toFixed(3)},${lon.toFixed(3)}`;
+}
+
 export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapPoints, heatmapHour, showHeatmap }: Props) {
   const mapRef = useRef<MapRef | null>(null);
   const [activeCheckpoint, setActiveCheckpoint] = useState<Checkpoint | null>(null);
+  const [mapStyleKey, setMapStyleKey] = useState("streets");
+  const [placeNames, setPlaceNames] = useState<Record<string, string>>({});
+  const [placeLoadingKey, setPlaceLoadingKey] = useState<string | null>(null);
   const initialBounds = useMemo(() => boundsFromRoutes(plan), [plan]);
+  const mapStyleUrl = MAP_STYLES.find((s) => s.key === mapStyleKey)?.url ?? MAP_STYLES[0].url;
+
+  useEffect(() => {
+    if (!activeCheckpoint) return;
+    const key = placeKey(activeCheckpoint.lat, activeCheckpoint.lon);
+    if (placeNames[key] || placeLoadingKey === key) return;
+    setPlaceLoadingKey(key);
+    reverseGeocode(activeCheckpoint.lat, activeCheckpoint.lon)
+      .then((label) => setPlaceNames((prev) => ({ ...prev, [key]: label })))
+      .catch(() => setPlaceNames((prev) => ({ ...prev, [key]: "Unknown area" })))
+      .finally(() => setPlaceLoadingKey(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCheckpoint]);
 
   const heatmapGeoJSON = useMemo(() => {
     if (!heatmapPoints) return null;
@@ -60,6 +89,8 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
   }
 
   const orderedRoutes = [...plan.routes].sort((a, b) => (a.id === selectedRouteId ? 1 : 0) - (b.id === selectedRouteId ? 1 : 0));
+  const activeKey = activeCheckpoint ? placeKey(activeCheckpoint.lat, activeCheckpoint.lon) : null;
+  const activePlaceName = activeKey ? placeNames[activeKey] : null;
 
   return (
     <Map
@@ -67,8 +98,11 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
       mapboxAccessToken={MAPBOX_TOKEN}
       initialViewState={{ bounds: initialBounds, fitBoundsOptions: { padding: 60 } }}
       style={{ width: "100%", height: "100%" }}
-      mapStyle="mapbox://styles/mapbox/light-v11"
+      mapStyle={mapStyleUrl}
     >
+      <NavigationControl position="top-right" visualizePitch />
+      <ScaleControl position="bottom-right" unit="imperial" />
+
       {showHeatmap && heatmapGeoJSON && (
         <Source id="corridor-heatmap" type="geojson" data={heatmapGeoJSON}>
           <Layer
@@ -113,15 +147,33 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
         );
       })}
 
-      {plan.routes[selectedRouteId]?.checkpoints.map((cp, idx) => (
-        <Marker key={idx} longitude={cp.lon} latitude={cp.lat} onClick={(e) => { e.originalEvent.stopPropagation(); setActiveCheckpoint(cp); }}>
-          <div
-            className="checkpoint-dot"
-            style={{ background: riskColor(cp.risk_level), borderColor: idx === 0 ? "#111" : "#fff" }}
-            title={`${cp.distance_mi} mi — ${cp.risk_level}`}
-          />
-        </Marker>
-      ))}
+      {plan.routes[selectedRouteId]?.checkpoints.map((cp, idx, arr) => {
+        const isEndpoint = idx === 0 || idx === arr.length - 1;
+        return (
+          <Marker key={idx} longitude={cp.lon} latitude={cp.lat}>
+            {isEndpoint ? (
+              <div
+                className={idx === 0 ? "endpoint-pin endpoint-origin" : "endpoint-pin endpoint-destination"}
+                onMouseEnter={() => setActiveCheckpoint(cp)}
+                onMouseLeave={() => setActiveCheckpoint((cur) => (cur === cp ? null : cur))}
+              >
+                <span className="endpoint-pin-icon">{idx === 0 ? "A" : "B"}</span>
+                <span className="endpoint-pin-label">{idx === 0 ? plan.origin.label : plan.destination.label}</span>
+              </div>
+            ) : (
+              <div
+                className="checkpoint-dot"
+                style={{ background: riskColor(cp.risk_level) }}
+                title={`${cp.distance_mi} mi — ${cp.risk_level}`}
+                onMouseEnter={() => setActiveCheckpoint(cp)}
+                onMouseLeave={() => setActiveCheckpoint((cur) => (cur === cp ? null : cur))}
+              >
+                <span className="checkpoint-dot-label">{cp.distance_mi}</span>
+              </div>
+            )}
+          </Marker>
+        );
+      })}
 
       {activeCheckpoint && (
         <Popup
@@ -132,7 +184,10 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
           anchor="bottom"
         >
           <div className="checkpoint-popup">
-            <strong>{activeCheckpoint.distance_mi} mi from origin</strong>
+            <strong className="checkpoint-popup-place">
+              {activePlaceName ?? (placeLoadingKey === activeKey ? "Locating…" : "")}
+            </strong>
+            <div>{activeCheckpoint.distance_mi} mi from origin</div>
             <div>ETA: {new Date(activeCheckpoint.eta).toLocaleString()}</div>
             <div style={{ color: riskColor(activeCheckpoint.risk_level), fontWeight: 600 }}>
               {activeCheckpoint.risk_level}
@@ -158,6 +213,18 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
             style={{ borderColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length] }}
           >
             {route.recommended ? "★ " : ""}Route {route.id + 1}
+          </button>
+        ))}
+      </div>
+
+      <div className="style-switcher">
+        {MAP_STYLES.map((s) => (
+          <button
+            key={s.key}
+            className={s.key === mapStyleKey ? "style-chip active" : "style-chip"}
+            onClick={() => setMapStyleKey(s.key)}
+          >
+            {s.label}
           </button>
         ))}
       </div>
