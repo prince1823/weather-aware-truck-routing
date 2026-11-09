@@ -18,12 +18,15 @@ export default function RouteSummaryCards({ routes, selectedRouteId, onSelectRou
 
   return (
     <div className="route-cards">
-      {sorted.map((route) => (
+      {sorted.map((route, idx) => (
         <button
           key={route.id}
-          className={route.id === selectedRouteId ? "route-card active" : "route-card"}
+          className={route.id === selectedRouteId ? "route-card active card-enter" : "route-card card-enter"}
           onClick={() => onSelectRoute(route.id)}
-          style={{ borderLeftColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length] }}
+          style={{
+            borderLeftColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length],
+            animationDelay: `${idx * 70}ms`,
+          }}
         >
           <div className="route-card-header">
             <span className="route-card-title">

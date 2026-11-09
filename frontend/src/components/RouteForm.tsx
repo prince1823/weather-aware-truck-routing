@@ -82,8 +82,19 @@ export default function RouteForm({ onSubmit, loading }: Props) {
         <p className="field-error">Pick a valid origin and destination before planning.</p>
       )}
 
-      <button type="submit" disabled={loading}>
-        {loading ? "Planning route…" : "Find safest route"}
+      <button type="submit" className={loading ? "submit-btn is-loading" : "submit-btn"} disabled={loading}>
+        {loading ? (
+          <span className="btn-loading">
+            Planning route
+            <span className="dot-pulse">
+              <span />
+              <span />
+              <span />
+            </span>
+          </span>
+        ) : (
+          "Find safest route"
+        )}
       </button>
     </form>
   );

@@ -60,12 +60,14 @@ def reverse_geocode(lat: float, lon: float) -> str:
     return features[0].get("place_name", "Unnamed area")
 
 
-def get_routes(origin: tuple[float, float], destination: tuple[float, float]) -> list[dict]:
-    """
-    origin/destination: (lat, lon). Returns raw Mapbox route objects
-    (up to 3), each with 'geometry.coordinates' and segment-level
-    'legs[0].annotation.distance' / 'duration' arrays aligned to the geometry.
-    """
+TARGET_ROUTE_COUNT = 3
+
+# Two routes are treated as "the same route" for de-duplication if both
+# their distance and duration are within this fraction of each other.
+DEDUP_TOLERANCE = 0.02
+
+
+def _request_directions(origin: tuple[float, float], destination: tuple[float, float], **extra_params: str) -> list[dict]:
     token = settings.MAPBOX_TOKEN
     if not token:
         raise MapboxError("MAPBOX_TOKEN is not configured on the server")
@@ -78,6 +80,7 @@ def get_routes(origin: tuple[float, float], destination: tuple[float, float]) ->
         "overview": "full",
         "annotations": "distance,duration",
         "access_token": token,
+        **extra_params,
     }
     resp = requests.get(url, params=params, timeout=20)
     resp.raise_for_status()
@@ -85,3 +88,44 @@ def get_routes(origin: tuple[float, float], destination: tuple[float, float]) ->
     if data.get("code") != "Ok":
         raise MapboxError(data.get("message", "Mapbox Directions request failed"))
     return data.get("routes", [])
+
+
+def _is_duplicate(candidate: dict, existing: list[dict]) -> bool:
+    for route in existing:
+        dist_close = abs(candidate["distance"] - route["distance"]) <= DEDUP_TOLERANCE * route["distance"]
+        dur_close = abs(candidate["duration"] - route["duration"]) <= DEDUP_TOLERANCE * route["duration"]
+        if dist_close and dur_close:
+            return True
+    return False
+
+
+def get_routes(origin: tuple[float, float], destination: tuple[float, float]) -> list[dict]:
+    """
+    origin/destination: (lat, lon). Returns up to 3 distinct raw Mapbox route
+    objects, each with 'geometry.coordinates' and segment-level
+    'legs[0].annotation.distance' / 'duration' arrays aligned to the geometry.
+
+    Mapbox's `alternatives=true` is documented as returning "up to two"
+    alternates, but in practice a simple intercity pair (e.g. one dominant
+    interstate corridor) often yields only one alternate -- two routes
+    total. When that happens, we make a second request excluding motorways
+    to find a genuinely different third route (e.g. a state-highway path)
+    and merge in the first one that isn't a near-duplicate of what we
+    already have. If the road network truly offers no third distinct path
+    (e.g. a short local trip), we return what's available rather than
+    fabricate a route.
+    """
+    routes = _request_directions(origin, destination)
+
+    if len(routes) < TARGET_ROUTE_COUNT:
+        try:
+            alt_routes = _request_directions(origin, destination, exclude="motorway")
+        except MapboxError:
+            alt_routes = []
+        for candidate in sorted(alt_routes, key=lambda r: r["distance"]):
+            if len(routes) >= TARGET_ROUTE_COUNT:
+                break
+            if not _is_duplicate(candidate, routes):
+                routes.append(candidate)
+
+    return routes[:TARGET_ROUTE_COUNT]

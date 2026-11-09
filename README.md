@@ -7,8 +7,17 @@ the truck's load weight.
 ## How it works
 
 1. **Routing & geocoding** — [Mapbox Directions API](https://docs.mapbox.com/api/navigation/directions/)
-   generates up to 3 alternative driving routes; [Mapbox Geocoding](https://docs.mapbox.com/api/search/geocoding/)
-   resolves the origin/destination text into coordinates.
+   generates alternative driving routes; [Mapbox Geocoding](https://docs.mapbox.com/api/search/geocoding/)
+   resolves the origin/destination text into coordinates. Mapbox's
+   `alternatives=true` is documented as returning "up to two" alternates,
+   but for a simple intercity pair dominated by one interstate corridor it
+   often returns only one (two routes total). When that happens, we make a
+   second request with `exclude=motorway` to find a genuinely different
+   third route (e.g. a state-highway path) and merge in the first result
+   that isn't a near-duplicate of what we already have — see
+   [`get_routes`](backend/routing/mapbox_client.py). If the road network
+   truly offers no third distinct path (e.g. same origin and destination),
+   we return what's available rather than fabricate a route.
 2. **Checkpoint sampling** — each route's geometry is walked and checkpoints
    are sampled at **10 mi** intervals for the first 100 miles, **25 mi**
    intervals from 100–300 miles, and **50 mi** intervals beyond that. This is

@@ -41,6 +41,12 @@ function placeKey(lat: number, lon: number): string {
   return `${lat.toFixed(3)},${lon.toFixed(3)}`;
 }
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
 export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapPoints, heatmapHour, showHeatmap }: Props) {
   const mapRef = useRef<MapRef | null>(null);
   const [activeCheckpoint, setActiveCheckpoint] = useState<Checkpoint | null>(null);
@@ -212,7 +218,13 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
             onClick={() => onSelectRoute(route.id)}
             style={{ borderColor: route.recommended ? "#16a34a" : ROUTE_COLORS[route.id % ROUTE_COLORS.length] }}
           >
-            {route.recommended ? "★ " : ""}Route {route.id + 1}
+            <span className="route-chip-title">
+              {route.recommended ? "★ " : ""}Route {route.id + 1}
+            </span>
+            <span className="route-chip-summary">
+              {route.summary.distance_mi} mi · {formatDuration(route.summary.duration_s)} ·{" "}
+              <span style={{ color: riskColor(route.summary.overall_risk) }}>{route.summary.overall_risk}</span>
+            </span>
           </button>
         ))}
       </div>

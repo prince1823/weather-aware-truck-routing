@@ -70,9 +70,22 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <h1>Weather-Aware Truck Routing</h1>
+        <div className="brand">
+          <span className="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 16V6a1 1 0 0 1 1-1h9v11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 9h4.5L21 12.5V16h-8V9Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="7" cy="17.5" r="1.8" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="17.5" cy="17.5" r="1.8" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          </span>
+          <div>
+            <h1>Weather-Aware Routing</h1>
+            <p className="brand-subtitle">Safer freight routes, forecast-driven</p>
+          </div>
+        </div>
         <RouteForm onSubmit={handleSubmit} loading={planLoading} />
-        {planError && <p className="field-error">{planError}</p>}
+        {planError && <p className="error-banner card-enter">{planError}</p>}
         {plan && (
           <RouteSummaryCards routes={plan.routes} selectedRouteId={selectedRouteId} onSelectRoute={handleSelectRoute} />
         )}
