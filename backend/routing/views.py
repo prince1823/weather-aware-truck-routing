@@ -12,7 +12,7 @@ from .heatmap import build_corridor_heatmap
 from .recommendation import CheckpointResult, rank_routes, summarize_route
 from .risk import WeatherSample, classify_checkpoint_risk
 from .serializers import GeocodeRequestSerializer, HeatmapRequestSerializer, PlanRequestSerializer, ReverseGeocodeRequestSerializer
-from .weather_client import fetch_hourly_batch
+from .weather_client import WeatherServiceError, fetch_hourly_batch
 
 
 @api_view(["GET"])
@@ -78,7 +78,10 @@ def plan(request):
         per_route_checkpoints_raw.append(checkpoints)
 
     all_checkpoints_flat = [cp for route_cps in per_route_checkpoints_raw for cp in route_cps]
-    series_flat = fetch_hourly_batch([(cp.lat, cp.lon) for cp in all_checkpoints_flat])
+    try:
+        series_flat = fetch_hourly_batch([(cp.lat, cp.lon) for cp in all_checkpoints_flat])
+    except WeatherServiceError as exc:
+        return Response({"error": f"Weather service is temporarily unavailable, please try again shortly ({exc})"}, status=503)
 
     series_iter = iter(series_flat)
     routes_payload = []
@@ -174,11 +177,14 @@ def heatmap(request):
     if not coordinates:
         return Response({"error": "geometry.coordinates is required"}, status=400)
 
-    points = build_corridor_heatmap(
-        coordinates,
-        data["distances_m"],
-        data["durations_s"],
-        data["departure_time"],
-        data["load_weight_lb"],
-    )
+    try:
+        points = build_corridor_heatmap(
+            coordinates,
+            data["distances_m"],
+            data["durations_s"],
+            data["departure_time"],
+            data["load_weight_lb"],
+        )
+    except WeatherServiceError as exc:
+        return Response({"error": f"Weather service is temporarily unavailable, please try again shortly ({exc})"}, status=503)
     return Response({"points": points, "max_hour_offset": 48})

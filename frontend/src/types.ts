@@ -20,7 +20,8 @@ export interface Checkpoint {
 }
 
 export interface RouteSummary {
-  severe_plus_miles: number;
+  no_travel_miles: number;
+  severe_miles: number;
   high_miles: number;
   average_risk: number;
   duration_s: number;

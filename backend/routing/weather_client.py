@@ -4,6 +4,7 @@ rain and snowfall, batched across many locations in a single request.
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -13,6 +14,17 @@ from .risk import WeatherSample
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 MAX_FORECAST_DAYS = 16
+
+# Open-Meteo's free tier enforces a per-minute rate limit; under bursty
+# traffic a 429 is transient, not a permanent failure, so we back off and
+# retry a couple of times before giving up.
+RETRY_STATUS_CODES = {429, 502, 503, 504}
+MAX_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 2.0
+
+
+class WeatherServiceError(Exception):
+    """Raised when Open-Meteo is unavailable after retries."""
 
 
 @dataclass
@@ -70,8 +82,28 @@ def fetch_hourly_batch(locations: list[tuple[float, float]], timeout: float = 20
         "timezone": "UTC",
         "forecast_days": MAX_FORECAST_DAYS,
     }
-    resp = requests.get(FORECAST_URL, params=params, timeout=timeout)
-    resp.raise_for_status()
+    resp = None
+    last_error: Exception | None = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(FORECAST_URL, params=params, timeout=timeout)
+            if resp.status_code in RETRY_STATUS_CODES and attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            raise WeatherServiceError(f"Weather service unavailable after {MAX_RETRIES} attempts: {exc}") from exc
+    else:
+        raise WeatherServiceError("Weather service unavailable")
+
+    if resp is None or not resp.ok:
+        raise WeatherServiceError(f"Weather service returned {resp.status_code if resp else 'no response'} after {MAX_RETRIES} attempts")
+
     data = resp.json()
 
     # Open-Meteo returns a single object (not a list) when only one location is requested.

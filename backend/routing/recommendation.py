@@ -30,7 +30,8 @@ class CheckpointResult:
 
 @dataclass
 class RouteSummary:
-    severe_plus_miles: float
+    no_travel_miles: float
+    severe_miles: float
     high_miles: float
     average_risk: float
     duration_s: float
@@ -39,7 +40,8 @@ class RouteSummary:
 
 
 def summarize_route(checkpoints: list[CheckpointResult], total_distance_mi: float, duration_s: float) -> RouteSummary:
-    severe_plus_miles = 0.0
+    no_travel_miles = 0.0
+    severe_miles = 0.0
     high_miles = 0.0
     weighted_risk_sum = 0.0
 
@@ -50,8 +52,10 @@ def summarize_route(checkpoints: list[CheckpointResult], total_distance_mi: floa
             segment_mi = max(0.0, checkpoints[i + 1].distance_mi - cp.distance_mi)
 
         level = RiskLevel[cp.risk_level.upper().replace(" ", "_")]
-        if level >= RiskLevel.SEVERE:
-            severe_plus_miles += segment_mi
+        if level == RiskLevel.NO_TRAVEL:
+            no_travel_miles += segment_mi
+        if level == RiskLevel.SEVERE:
+            severe_miles += segment_mi
         if level == RiskLevel.HIGH:
             high_miles += segment_mi
         weighted_risk_sum += int(level) * segment_mi
@@ -60,7 +64,8 @@ def summarize_route(checkpoints: list[CheckpointResult], total_distance_mi: floa
     overall = max((RiskLevel[cp.risk_level.upper().replace(" ", "_")] for cp in checkpoints), default=RiskLevel.LOW)
 
     return RouteSummary(
-        severe_plus_miles=round(severe_plus_miles, 1),
+        no_travel_miles=round(no_travel_miles, 1),
+        severe_miles=round(severe_miles, 1),
         high_miles=round(high_miles, 1),
         average_risk=round(average_risk, 3),
         duration_s=duration_s,
@@ -71,10 +76,28 @@ def summarize_route(checkpoints: list[CheckpointResult], total_distance_mi: floa
 
 def rank_routes(summaries: list[RouteSummary]) -> list[int]:
     """
-    Returns indices of `summaries` ordered best-first, applying the brief's
-    tie-break priority: fewest severe+ miles, then fewest high miles,
-    then lowest average risk, then shortest travel time.
+    Returns indices of `summaries` ordered best-first.
+
+    The brief's stated tie-break order is: fewest Severe miles, then
+    fewest High miles, then lowest average risk, then shortest travel
+    time. We lead with one additional, higher-priority criterion the
+    brief doesn't explicitly address: fewest No Travel miles. No Travel
+    means the truck should not proceed through that segment at all --
+    it is categorically worse than "risky but passable" Severe
+    conditions, so a route with any No Travel exposure must never
+    outrank one without it just because its raw mileage-at-risk happens
+    to be smaller (e.g. 5mi of No Travel is not "better" than 10mi of
+    Severe). Among routes tied on No Travel exposure, the brief's four
+    criteria apply exactly as stated.
     """
     indexed = list(enumerate(summaries))
-    indexed.sort(key=lambda pair: (pair[1].severe_plus_miles, pair[1].high_miles, pair[1].average_risk, pair[1].duration_s))
+    indexed.sort(
+        key=lambda pair: (
+            pair[1].no_travel_miles,
+            pair[1].severe_miles,
+            pair[1].high_miles,
+            pair[1].average_risk,
+            pair[1].duration_s,
+        )
+    )
     return [i for i, _ in indexed]

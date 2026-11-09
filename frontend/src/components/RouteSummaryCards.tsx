@@ -40,7 +40,10 @@ export default function RouteSummaryCards({ routes, selectedRouteId, onSelectRou
           <div className="route-card-stats">
             <span>{route.summary.distance_mi} mi</span>
             <span>{formatDuration(route.summary.duration_s)}</span>
-            <span>{route.summary.severe_plus_miles} mi severe+</span>
+            {route.summary.no_travel_miles > 0 && (
+              <span className="stat-no-travel">{route.summary.no_travel_miles} mi no-travel</span>
+            )}
+            <span>{route.summary.severe_miles} mi severe</span>
             <span>{route.summary.high_miles} mi high</span>
           </div>
         </button>

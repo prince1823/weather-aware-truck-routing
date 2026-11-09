@@ -35,9 +35,15 @@ the truck's load weight.
 5. **Risk classification** — wind/rain/snow thresholds classify each
    checkpoint as Low/Moderate/High/Severe/No Travel, with load-weight
    escalation rules applied on top (see `backend/routing/risk.py`).
-6. **Recommendation** — routes are ranked by: fewest Severe+ miles → fewest
-   High miles → lowest average risk → shortest travel time
-   (`backend/routing/recommendation.py`). Mileage-at-risk is attributed by
+6. **Recommendation** — routes are ranked by: fewest No Travel miles → fewest
+   Severe miles → fewest High miles → lowest average risk → shortest travel
+   time (`backend/routing/recommendation.py`). The first criterion isn't in
+   the brief's four, but is necessary: No Travel means the truck shouldn't
+   proceed at all, so a route with *any* No Travel exposure must never
+   outrank one without it just because its raw mileage happens to be
+   smaller (e.g. 5mi of No Travel is not "better" than 10mi of merely-risky
+   Severe). Among routes tied on No Travel exposure, the brief's four
+   criteria apply exactly as stated. Mileage-at-risk is attributed by
    treating each checkpoint's risk as representative of the segment running
    to the next checkpoint.
 7. **Map & heatmap** — the frontend renders all 3 routes, color-coded

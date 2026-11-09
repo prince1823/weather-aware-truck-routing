@@ -174,7 +174,7 @@ export default function MapView({ plan, selectedRouteId, onSelectRoute, heatmapP
                 onMouseEnter={() => setActiveCheckpoint(cp)}
                 onMouseLeave={() => setActiveCheckpoint((cur) => (cur === cp ? null : cur))}
               >
-                <span className="checkpoint-dot-label">{cp.distance_mi}</span>
+                {activeCheckpoint === cp && <span className="checkpoint-dot-label">{cp.distance_mi} mi</span>}
               </div>
             )}
           </Marker>

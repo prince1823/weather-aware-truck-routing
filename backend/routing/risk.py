@@ -36,9 +36,15 @@ RAIN_BOUNDS_IN_HR = (0.10, 0.25, 0.50, 1.00)
 SNOW_BOUNDS_IN_HR = (0.5, 1.0, 2.0, 3.0)
 
 
-def _classify(value: float, bounds: tuple[float, float, float, float]) -> RiskLevel:
+def _classify(value: float, bounds: tuple[float, float, float, float], no_travel_strict: bool = False) -> RiskLevel:
+    """
+    no_travel_strict=True means the No Travel bound is an exclusive ">"
+    (matches the brief's "Rain >1.00" / "Snow >3.0"); False means ">="
+    (matches the brief's "Wind >=55 mph").
+    """
     low, high, severe, no_travel = bounds
-    if value >= no_travel:
+    no_travel_hit = value > no_travel if no_travel_strict else value >= no_travel
+    if no_travel_hit:
         return RiskLevel.NO_TRAVEL
     if value >= severe:
         return RiskLevel.SEVERE
@@ -71,9 +77,9 @@ def classify_checkpoint_risk(weather: WeatherSample, load_lb: float) -> RiskResu
     truck's load weight, applying the load-escalation rules on top of the
     base per-condition thresholds.
     """
-    wind_level = _classify(weather.wind_mph, WIND_BOUNDS_MPH)
-    rain_level = _classify(weather.rain_in_hr, RAIN_BOUNDS_IN_HR)
-    snow_level = _classify(weather.snow_in_hr, SNOW_BOUNDS_IN_HR)
+    wind_level = _classify(weather.wind_mph, WIND_BOUNDS_MPH, no_travel_strict=False)
+    rain_level = _classify(weather.rain_in_hr, RAIN_BOUNDS_IN_HR, no_travel_strict=True)
+    snow_level = _classify(weather.snow_in_hr, SNOW_BOUNDS_IN_HR, no_travel_strict=True)
 
     level = max(wind_level, rain_level, snow_level)
     reason = f"base:{level.label}"

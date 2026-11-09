@@ -44,6 +44,25 @@ class RiskClassificationTests(SimpleTestCase):
         result = classify_checkpoint_risk(WeatherSample(wind_mph=38, rain_in_hr=0.0, snow_in_hr=0.0), load_lb=20_000)
         self.assertEqual(result.level, RiskLevel.HIGH)  # base classification for 35-44 wind, no load escalation
 
+    def test_wind_no_travel_boundary_is_inclusive(self):
+        # Brief: Wind No Travel is ">=55 mph" -- exactly 55 is No Travel.
+        result = classify_checkpoint_risk(WeatherSample(wind_mph=55, rain_in_hr=0.0, snow_in_hr=0.0), load_lb=10_000)
+        self.assertEqual(result.level, RiskLevel.NO_TRAVEL)
+
+    def test_rain_no_travel_boundary_is_exclusive(self):
+        # Brief: Rain No Travel is ">1.00 in/hr" (strict) -- exactly 1.00 is still Severe.
+        result = classify_checkpoint_risk(WeatherSample(wind_mph=0, rain_in_hr=1.00, snow_in_hr=0.0), load_lb=10_000)
+        self.assertEqual(result.level, RiskLevel.SEVERE)
+        result = classify_checkpoint_risk(WeatherSample(wind_mph=0, rain_in_hr=1.01, snow_in_hr=0.0), load_lb=10_000)
+        self.assertEqual(result.level, RiskLevel.NO_TRAVEL)
+
+    def test_snow_no_travel_boundary_is_exclusive(self):
+        # Brief: Snow No Travel is ">3.0 in/hr" (strict) -- exactly 3.0 is still Severe.
+        result = classify_checkpoint_risk(WeatherSample(wind_mph=0, rain_in_hr=0.0, snow_in_hr=3.0), load_lb=10_000)
+        self.assertEqual(result.level, RiskLevel.SEVERE)
+        result = classify_checkpoint_risk(WeatherSample(wind_mph=0, rain_in_hr=0.0, snow_in_hr=3.01), load_lb=10_000)
+        self.assertEqual(result.level, RiskLevel.NO_TRAVEL)
+
     def test_load_rule_never_downgrades_existing_higher_risk(self):
         # Heavy rain alone is already Severe; a 35-44mph+heavy-load escalation to Severe shouldn't downgrade it.
         result = classify_checkpoint_risk(WeatherSample(wind_mph=38, rain_in_hr=0.80, snow_in_hr=0.0), load_lb=45_000)
@@ -82,7 +101,8 @@ class RecommendationTests(SimpleTestCase):
     def test_summarize_route_mileage_attribution(self):
         checkpoints = [self._cp(0, "Low"), self._cp(10, "Severe"), self._cp(20, "Low")]
         summary = summarize_route(checkpoints, total_distance_mi=20, duration_s=1200)
-        self.assertEqual(summary.severe_plus_miles, 10.0)
+        self.assertEqual(summary.severe_miles, 10.0)
+        self.assertEqual(summary.no_travel_miles, 0.0)
         self.assertEqual(summary.overall_risk, "Severe")
 
     def test_rank_routes_prefers_fewer_severe_miles(self):
@@ -96,3 +116,16 @@ class RecommendationTests(SimpleTestCase):
         slow = summarize_route([self._cp(0, "Low"), self._cp(50, "Low")], 50, 5000)
         ranking = rank_routes([slow, fast])
         self.assertEqual(ranking[0], 1)
+
+    def test_no_travel_always_outranked_even_with_fewer_bad_miles(self):
+        # 5mi of No Travel (categorically impassable) must never beat
+        # 10mi of merely-risky Severe, even though 5 < 10.
+        few_no_travel = summarize_route([self._cp(0, "Low"), self._cp(5, "No Travel"), self._cp(10, "Low")], 10, 1000)
+        lots_of_severe = summarize_route([self._cp(0, "Low"), self._cp(10, "Severe"), self._cp(20, "Low")], 20, 1000)
+        ranking = rank_routes([few_no_travel, lots_of_severe])
+        self.assertEqual(ranking[0], 1)  # the Severe-only route (index 1) should rank first
+
+    def test_no_travel_miles_zero_when_route_is_clean(self):
+        checkpoints = [self._cp(0, "Low"), self._cp(50, "Moderate")]
+        summary = summarize_route(checkpoints, total_distance_mi=50, duration_s=3600)
+        self.assertEqual(summary.no_travel_miles, 0.0)
