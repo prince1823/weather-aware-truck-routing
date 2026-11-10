@@ -4,6 +4,10 @@ A React + Django application that helps a truck driver choose the safest
 route between an origin and destination, balancing forecasted wind, rain,
 and snow against the truck's load weight and travel time.
 
+**Live app:** https://truck-routing-frontend.princesaxena.workers.dev
+**API:** https://truck-routing-api-pjek.onrender.com (free Render tier — the
+first request after a period of inactivity can take ~30–60s to wake up)
+
 ## Overview
 
 The driver enters an origin, destination, departure time, and load weight.
