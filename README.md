@@ -176,6 +176,14 @@ deploy, set the `MAPBOX_TOKEN` and `CORS_ALLOWED_ORIGINS` (your frontend's
 URL) env vars in the Render dashboard — they're marked `sync: false` so
 Render won't auto-fill them.
 
+**Cold starts:** the service runs on Render's free tier, which spins the
+instance down after a period of inactivity. The *first* request after that
+(e.g. the first route plan after the app has been idle for a while) can
+take roughly **30–60 seconds** to respond while Render boots the instance
+back up — it isn't a bug, just the tradeoff of the free plan. Every request
+after that first one is fast again until it goes idle once more. Upgrading
+to a paid Render plan removes this entirely by keeping the instance warm.
+
 ### Frontend → Cloudflare Workers
 
 ```bash
